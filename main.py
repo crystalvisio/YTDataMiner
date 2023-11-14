@@ -1,17 +1,21 @@
+# Import necessary libraries
 import os 
-import json
 import csv
+import json
 import requests
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
+# Get YouTube API key from environment variables
 API_KEY = os.getenv("YOUTUBE_API_KEY")
+# Define YouTube API endpoint
 YOUTUBE_URL_ENDPOINT = "https://www.googleapis.com/youtube/v3/search"
 
+# Function to get video IDs based on search query
 def get_video_id(search_query, max_results):
-
-    # Defining search params
+    # Define search parameters
     params = {
         "part": "snippet",
         "q": search_query,
@@ -20,13 +24,28 @@ def get_video_id(search_query, max_results):
         "key": API_KEY
     }
 
-    # Send GET request
-    response = requests.get(url = YOUTUBE_URL_ENDPOINT, params = params)
+    # Try to send GET request to YouTube API
+    try:
+        response = requests.get(url = YOUTUBE_URL_ENDPOINT, params = params)
+        # If the response indicates an error, raise an exception
+        response.raise_for_status()
+    # Catch and handle exceptions
+    except requests.exceptions.HTTPError as errh:
+        print ("HTTP Error:",errh)
+        return []
+    except requests.exceptions.ConnectionError as errc:
+        print ("Error Connecting:",errc)
+        return []
+    except requests.exceptions.Timeout as errt:
+        print ("Timeout Error:",errt)
+        return []
+    except requests.exceptions.RequestException as err:
+        print ("Something went wrong",err)
+        return []
 
-    # convert data to json
+    # Convert the response data to JSON
     data = response.json()
-
-    # Extract the video IDs from the response
+    # Extract video IDs from the data
     video_ids = [item["id"]["videoId"] for item in data["items"]]
 
     # Get video urls
@@ -34,26 +53,43 @@ def get_video_id(search_query, max_results):
 
     return video_ids
 
-# Search keyword 
-def get_video_data():
-    video_ids = get_video_id("Database Tutorial", 1000)
-    # Define the endpoint URL
+# Function to get video data based on video IDs
+def get_video_data(search_query, max_results):
+    # Get video IDs
+    video_ids = get_video_id(search_query, max_results)
+    # Define YouTube API endpoint
     url = f"https://www.googleapis.com/youtube/v3/videos"
 
-    # Define the parameters for the request
+    # Define search parameters
     params = {
         "part": "snippet,statistics",
         "id": ','.join(video_ids),
         "key": API_KEY
     }
 
-    # Send the GET request
-    response = requests.get(url, params=params)
+    # Try to send GET request to YouTube API
+    try:
+        response = requests.get(url, params=params)
+        # If the response indicates an error, raise an exception
+        response.raise_for_status()
+    # Catch and handle exceptions
+    except requests.exceptions.HTTPError as errh:
+        print ("HTTP Error:",errh)
+        return []
+    except requests.exceptions.ConnectionError as errc:
+        print ("Error Connecting:",errc)
+        return []
+    except requests.exceptions.Timeout as errt:
+        print ("Timeout Error:",errt)
+        return []
+    except requests.exceptions.RequestException as err:
+        print ("Something went wrong",err)
+        return []
 
-    # Convert the response to JSON
+    # Convert the response data to JSON
     data = response.json()
 
-    # Extract the video statistics and details from the response
+    # Extract video data from the response
     videos_data = []
     for item in data["items"]:
         video_data = item["snippet"]
@@ -66,19 +102,28 @@ def get_video_data():
             "comments": video_statistics.get("commentCount", "N/A")
         })
 
-    # Return the data as a JSON object
+    # Return the video data as a JSON object
     return json.dumps(videos_data)
 
-result = json.loads(get_video_data())
+# Function to export video data to a CSV file
+def export_to_csv(result):
+    csv_file = "video_data.csv"
+    with open(csv_file, mode="w", newline = "", encoding ="utf-8") as file:
+        fieldnames = ["title", "likes", "dislikes", "views", "comments"]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for video in result:
+            writer.writerow(video)
 
-# Export to a CSV file
-csv_file = "video_data.csv"
-with open(csv_file, mode="w", newline = "", encoding ="utf-8") as file:
-    fieldnames = ["title", "likes", "dislikes", "views", "comments"]
-    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    # Print a success message
+    print(f"Video data exported to {csv_file}")
 
-    writer.writeheader()
-    for video in result:
-        writer.writerow(video)
+# Main function to run the script
+def main():
+    # Get video data for a specific search query
+    result = json.loads(get_video_data("Database Tutorial", 1000))
+    # Export the video data to a CSV file
+    export_to_csv(result)
 
-print(f"Video data exported to {csv_file}")
+if __name__ == "__main__":
+    main()
